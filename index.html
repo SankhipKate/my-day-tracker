@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#eef3f1">
+    <title>Сегодня</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icons/icon-192.svg">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="todayLabel">Сегодня</p>
+          <h1>Мой день</h1>
+        </div>
+        <div class="top-actions">
+          <button class="small-button" id="exportData" type="button">Export</button>
+          <button class="small-button" id="importData" type="button">Import</button>
+          <button class="icon-button" id="openAddDialog" aria-label="Добавить">+</button>
+        </div>
+      </header>
+
+      <section class="auth-panel" id="authPanel">
+        <h2>Вход</h2>
+        <p>Войди с одним email на ноуте и телефоне, чтобы задачи синхронизировались.</p>
+        <form id="authForm">
+          <label>
+            Email
+            <input name="email" type="email" required autocomplete="email" placeholder="you@example.com">
+          </label>
+          <label>
+            Пароль
+            <input name="password" type="password" required minlength="6" autocomplete="current-password" placeholder="Минимум 6 символов">
+          </label>
+          <button class="primary-button" type="submit">Войти / создать аккаунт</button>
+        </form>
+        <p class="auth-status" id="authStatus"></p>
+      </section>
+
+      <section class="signed-in-panel is-hidden" id="signedInPanel">
+        <span id="signedInEmail"></span>
+        <button class="ghost-button" id="signOut" type="button">Выйти</button>
+      </section>
+
+      <main id="appContent">
+        <section class="view is-active" id="viewToday" aria-labelledby="todayTitle">
+          <div class="section-heading">
+            <h2 id="todayTitle">Сегодня</h2>
+            <span id="todayCount">0 задач</span>
+          </div>
+
+          <div class="quick-filters today-modes" aria-label="Режим сегодня">
+            <button class="chip task-mode is-active" data-today-mode="tasks">Задачи</button>
+            <button class="chip habit-mode" data-today-mode="habits">Привычки</button>
+            <button class="chip" data-today-mode="urgency">По срочности</button>
+            <button class="chip" data-today-mode="category">По категориям</button>
+          </div>
+
+          <div class="task-list" id="todayList"></div>
+          <div class="empty-state" id="todayEmpty">
+            <h3>На сегодня пусто</h3>
+            <p>Добавь разовую задачу или ежедневную привычку.</p>
+          </div>
+        </section>
+
+        <section class="view" id="viewTasks" aria-labelledby="tasksTitle">
+          <div class="section-heading">
+            <h2 id="tasksTitle">Задачи</h2>
+            <span>активные</span>
+          </div>
+
+          <div class="quick-filters" aria-label="Группировка задач">
+            <button class="chip is-active" data-task-group="urgency">Разложить по срочности</button>
+            <button class="chip" data-task-group="category">Разложить по категориям</button>
+          </div>
+
+          <div id="tasksList"></div>
+          <div class="empty-state" id="tasksEmpty">
+            <h3>Активных задач нет</h3>
+            <p>Разовые задачи появятся здесь до выполнения.</p>
+          </div>
+        </section>
+
+        <section class="view" id="viewHabits" aria-labelledby="habitsTitle">
+          <div class="section-heading">
+            <h2 id="habitsTitle">Привычки</h2>
+            <span id="weekRange"></span>
+          </div>
+
+          <div class="habit-grid" id="habitGrid"></div>
+          <div class="empty-state" id="habitsEmpty">
+            <h3>Привычек пока нет</h3>
+            <p>Добавь ежедневную привычку, и здесь появится неделя.</p>
+          </div>
+        </section>
+
+        <section class="view" id="viewDone" aria-labelledby="doneTitle">
+          <div class="section-heading">
+            <h2 id="doneTitle">Выполненные</h2>
+            <span id="doneCount">0</span>
+          </div>
+
+          <div class="quick-filters" aria-label="Фильтр выполненных">
+            <button class="chip is-active" data-done-filter="all">Все</button>
+            <button class="chip" data-done-filter="task">Задачи</button>
+            <button class="chip" data-done-filter="habit">Привычки</button>
+          </div>
+
+          <div id="doneList"></div>
+          <div class="empty-state" id="doneEmpty">
+            <h3>Архив пуст</h3>
+            <p>Выполненные дела появятся здесь с датой.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <nav class="tabbar" aria-label="Разделы">
+      <button class="tab is-active" data-view="today">Сегодня</button>
+      <button class="tab" data-view="tasks">Задачи</button>
+      <button class="tab" data-view="habits">Привычки</button>
+      <button class="tab" data-view="done">Выполнено</button>
+    </nav>
+
+    <dialog class="task-dialog" id="taskDialog">
+      <form method="dialog" id="taskForm">
+        <div class="dialog-header">
+          <h2 id="dialogTitle">Новая запись</h2>
+          <button class="ghost-button" value="cancel" aria-label="Закрыть">Закрыть</button>
+        </div>
+
+        <input id="editingId" name="editingId" type="hidden">
+
+        <label>
+          Название
+          <input id="taskTitle" name="title" required autocomplete="off" placeholder="Например: испанский 15 минут">
+        </label>
+
+        <fieldset>
+          <legend>Тип</legend>
+          <label class="radio-card">
+            <input type="radio" name="type" value="task" checked>
+            <span>Разовая задача</span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="type" value="habit">
+            <span>Ежедневная привычка</span>
+          </label>
+        </fieldset>
+
+        <label>
+          Категория
+          <input id="myTrackerCategoryInput" name="myTrackerCategoryInput" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="Напиши свою категорию">
+        </label>
+
+        <div class="category-suggestions" id="categorySuggestions" aria-label="Твои категории"></div>
+
+        <label>
+          Срочность
+          <select id="taskUrgency" name="urgency">
+            <option value="high">Высокая</option>
+            <option value="medium" selected>Средняя</option>
+            <option value="low">Низкая</option>
+          </select>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="ghost-button" id="clearCategory" type="button">Очистить категорию</button>
+          <button class="primary-button" id="saveButton" value="default">Добавить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <input id="backupFile" type="file" accept="application/json,.json" hidden>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
