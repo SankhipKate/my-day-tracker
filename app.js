@@ -1,11 +1,12 @@
 const state = { items: [] };
 let activeView = "today";
-let todayMode = "tasks";
+let todayMode = "urgency";
 let taskGroup = "urgency";
 let doneFilter = "all";
 let editingId = "";
 let currentUser = null;
 let supabaseClient = null;
+let authReady = false;
 
 const urgencyLabels = { high: "Высокая", medium: "Средняя", low: "Низкая" };
 const urgencyOrder = ["high", "medium", "low"];
@@ -21,6 +22,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 function setupSupabase() {
   const config = window.MY_DAY_TRACKER_SUPABASE || {};
   if (!config.url || !config.anonKey || config.url.includes("PASTE_")) {
+    authReady = true;
     setStatus("Добавь Supabase URL и anon key в supabase-config.js.");
     return;
   }
@@ -28,15 +30,20 @@ function setupSupabase() {
 }
 
 async function initAuth() {
-  if (!supabaseClient) return;
+  if (!supabaseClient) {
+    authReady = true;
+    return;
+  }
   const { data } = await supabaseClient.auth.getSession();
   currentUser = data.session?.user || null;
   supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     currentUser = session?.user || null;
+    authReady = true;
     await loadCloudState();
     render();
   });
   await loadCloudState();
+  authReady = true;
 }
 
 function bindEvents() {
@@ -246,10 +253,10 @@ async function deleteItem(id) {
 
 function render() {
   document.querySelector("#todayLabel").textContent = formatLongDate(todayISO());
-  document.querySelector("#authPanel").classList.toggle("is-hidden", Boolean(currentUser));
-  document.querySelector("#signedInPanel").classList.toggle("is-hidden", !currentUser);
-  document.querySelector("#appContent").classList.toggle("is-disabled", !currentUser);
-  document.querySelector("#signedInEmail").textContent = currentUser?.email || "";
+  document.querySelector("#authLoading").classList.toggle("is-hidden", authReady);
+  document.querySelector("#authPanel").classList.toggle("is-hidden", !authReady || Boolean(currentUser));
+  document.querySelector("#signOut").classList.toggle("is-hidden", !authReady || !currentUser);
+  document.querySelector("#appContent").classList.toggle("is-disabled", !authReady || !currentUser);
 
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("is-active", view.id === `view${capitalize(activeView)}`);
@@ -273,7 +280,14 @@ function renderToday() {
     return true;
   }));
   list.innerHTML = "";
-  items.forEach((item) => list.appendChild(taskCard(item)));
+  if (todayMode === "category") {
+    const categories = [...new Set(items.map((item) => displayCategory(item.category)))].sort((a, b) => a.localeCompare(b, "ru"));
+    categories.forEach((category) => appendGroup(list, category, items.filter((item) => displayCategory(item.category) === category)));
+  } else if (todayMode === "urgency") {
+    urgencyOrder.forEach((urgency) => appendGroup(list, urgencyLabels[urgency], items.filter((item) => item.urgency === urgency)));
+  } else {
+    items.forEach((item) => list.appendChild(taskCard(item)));
+  }
   document.querySelector("#todayCount").textContent = `${items.length} ${pluralTasks(items.length)}`;
   setEmpty("#todayEmpty", items.length === 0);
 }
