@@ -56,9 +56,16 @@ button {
 }
 
 .top-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
   align-items: center;
+  justify-content: end;
   gap: 8px;
+}
+
+.top-actions .icon-button {
+  grid-column: 1 / -1;
+  justify-self: end;
 }
 
 h1,
@@ -163,10 +170,20 @@ h3 {
 
 .quick-filters {
   display: flex;
+  justify-content: center;
   gap: 8px;
   overflow-x: auto;
   margin: 0 -18px 16px;
   padding: 0 18px 2px;
+}
+
+.today-modes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  justify-content: center;
+  margin: 0 0 16px;
+  padding: 0;
+  overflow: visible;
 }
 
 .chip {
@@ -177,6 +194,13 @@ h3 {
   color: var(--text);
   padding: 8px 13px;
   font-weight: 700;
+  text-align: center;
+}
+
+.today-modes .chip {
+  width: 100%;
+  padding-right: 8px;
+  padding-left: 8px;
 }
 
 .chip.task-mode {
@@ -554,8 +578,6 @@ select {
   }
 
   .top-actions {
-    flex-wrap: wrap;
-    justify-content: flex-end;
     gap: 6px;
   }
 
@@ -576,5 +598,14 @@ select {
   .chip {
     padding: 8px 10px;
     font-size: 14px;
+  }
+
+  .today-modes {
+    gap: 6px;
+  }
+
+  .today-modes .chip {
+    padding: 8px 4px;
+    font-size: 13px;
   }
 }
