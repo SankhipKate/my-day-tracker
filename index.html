@@ -13,17 +13,21 @@
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow" id="todayLabel">Сегодня</p>
-          <h1>Мой день</h1>
+          <h1 id="todayLabel">Сегодня</h1>
         </div>
         <div class="top-actions">
           <button class="small-button" id="exportData" type="button">Export</button>
           <button class="small-button" id="importData" type="button">Import</button>
+          <button class="small-button is-hidden" id="signOut" type="button">Выйти</button>
           <button class="icon-button" id="openAddDialog" aria-label="Добавить">+</button>
         </div>
       </header>
 
-      <section class="auth-panel" id="authPanel">
+      <section class="auth-loading" id="authLoading">
+        Проверяем вход...
+      </section>
+
+      <section class="auth-panel is-hidden" id="authPanel">
         <h2>Вход</h2>
         <p>Войди с одним email на ноуте и телефоне, чтобы задачи синхронизировались.</p>
         <form id="authForm">
@@ -40,23 +44,17 @@
         <p class="auth-status" id="authStatus"></p>
       </section>
 
-      <section class="signed-in-panel is-hidden" id="signedInPanel">
-        <span id="signedInEmail"></span>
-        <button class="ghost-button" id="signOut" type="button">Выйти</button>
-      </section>
-
       <main id="appContent">
-        <section class="view is-active" id="viewToday" aria-labelledby="todayTitle">
+        <section class="view is-active" id="viewToday" aria-labelledby="todayLabel">
           <div class="section-heading">
-            <h2 id="todayTitle">Сегодня</h2>
             <span id="todayCount">0 задач</span>
           </div>
 
           <div class="quick-filters today-modes" aria-label="Режим сегодня">
-            <button class="chip task-mode is-active" data-today-mode="tasks">Задачи</button>
+            <button class="chip task-mode" data-today-mode="tasks">Задачи</button>
             <button class="chip habit-mode" data-today-mode="habits">Привычки</button>
-            <button class="chip" data-today-mode="urgency">По срочности</button>
-            <button class="chip" data-today-mode="category">По категориям</button>
+            <button class="chip is-active" data-today-mode="urgency">Срочность</button>
+            <button class="chip" data-today-mode="category">Категории</button>
           </div>
 
           <div class="task-list" id="todayList"></div>
