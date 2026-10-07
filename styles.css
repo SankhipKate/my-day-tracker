@@ -61,12 +61,6 @@ button {
   gap: 8px;
 }
 
-.eyebrow {
-  margin: 0 0 4px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
 h1,
 h2,
 h3,
@@ -76,7 +70,7 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-size: 36px;
+  font-size: 34px;
   line-height: 1.05;
 }
 
@@ -120,8 +114,8 @@ h3 {
   display: block;
 }
 
-.auth-panel,
-.signed-in-panel {
+.auth-loading,
+.auth-panel {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--panel);
@@ -139,11 +133,7 @@ h3 {
   padding: 0;
 }
 
-.signed-in-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.auth-loading {
   color: var(--muted);
   font-size: 14px;
 }
@@ -160,9 +150,9 @@ h3 {
 .section-heading {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .section-heading span {
@@ -183,9 +173,10 @@ h3 {
   flex: 0 0 auto;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(251, 254, 253, 0.78);
+  background: rgba(102, 118, 116, 0.09);
   color: var(--text);
   padding: 8px 13px;
+  font-weight: 700;
 }
 
 .chip.task-mode {
@@ -196,7 +187,19 @@ h3 {
   background: var(--habit-bg);
 }
 
-.chip.is-active {
+.chip.task-mode.is-active {
+  border-color: var(--task-edge);
+  box-shadow: inset 0 0 0 1.5px var(--task-edge);
+  color: var(--task-edge);
+}
+
+.chip.habit-mode.is-active {
+  border-color: var(--habit-edge);
+  box-shadow: inset 0 0 0 1.5px var(--habit-edge);
+  color: var(--habit-edge);
+}
+
+.chip.is-active:not(.task-mode):not(.habit-mode) {
   border-color: var(--accent);
   background: var(--accent);
   color: white;
@@ -541,7 +544,7 @@ select {
   }
 
   h1 {
-    font-size: 42px;
+    font-size: 44px;
   }
 }
 
@@ -553,9 +556,25 @@ select {
   .top-actions {
     flex-wrap: wrap;
     justify-content: flex-end;
+    gap: 6px;
   }
 
   .small-button {
-    padding: 8px 9px;
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+
+  .icon-button {
+    width: 46px;
+    height: 46px;
+  }
+
+  h1 {
+    font-size: 30px;
+  }
+
+  .chip {
+    padding: 8px 10px;
+    font-size: 14px;
   }
 }
