@@ -8,8 +8,12 @@ create table if not exists public.tracker_items (
   active boolean not null default true,
   completed_at date,
   completion_dates jsonb not null default '[]'::jsonb,
+  planned_today_at date,
   created_at timestamptz not null default now()
 );
+
+alter table public.tracker_items
+add column if not exists planned_today_at date;
 
 alter table public.tracker_items enable row level security;
 

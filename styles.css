@@ -263,6 +263,10 @@ h3 {
   text-decoration: line-through;
 }
 
+.task-card.is-planned-today {
+  box-shadow: 0 0 0 2px rgba(31, 111, 103, 0.16);
+}
+
 .check-button {
   display: grid;
   place-items: center;
@@ -324,11 +328,22 @@ h3 {
 }
 
 .delete-button,
-.edit-button {
+.edit-button,
+.plan-button {
   border: 0;
   background: transparent;
   color: var(--muted);
   padding: 8px;
+}
+
+.plan-button {
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.plan-button.is-active {
+  color: var(--accent-strong);
 }
 
 .card-actions {
