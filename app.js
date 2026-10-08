@@ -240,6 +240,15 @@ async function toggleItem(id) {
   render();
 }
 
+async function togglePlanToday(id) {
+  const item = state.items.find((entry) => entry.id === id);
+  if (!item) return;
+  const today = todayISO();
+  item.plannedTodayAt = item.plannedTodayAt === today ? null : today;
+  await saveItem(item);
+  render();
+}
+
 async function deleteItem(id) {
   const index = state.items.findIndex((entry) => entry.id === id);
   if (index < 0) return;
@@ -284,7 +293,8 @@ function renderToday() {
     const categories = [...new Set(items.map((item) => displayCategory(item.category)))].sort((a, b) => a.localeCompare(b, "ru"));
     categories.forEach((category) => appendGroup(list, category, items.filter((item) => displayCategory(item.category) === category)));
   } else if (todayMode === "urgency") {
-    urgencyOrder.forEach((urgency) => appendGroup(list, urgencyLabels[urgency], items.filter((item) => item.urgency === urgency)));
+    appendGroup(list, "Собираюсь сделать сегодня", items.filter(isPlannedToday));
+    urgencyOrder.forEach((urgency) => appendGroup(list, urgencyLabels[urgency], items.filter((item) => !isPlannedToday(item) && item.urgency === urgency)));
   } else {
     items.forEach((item) => list.appendChild(taskCard(item)));
   }
@@ -361,8 +371,9 @@ function renderDone() {
 
 function taskCard(item) {
   const done = isDoneToday(item);
+  const planned = isPlannedToday(item);
   const card = document.createElement("article");
-  card.className = `task-card is-${item.type}${done ? " is-done" : ""}`;
+  card.className = `task-card is-${item.type}${done ? " is-done" : ""}${planned ? " is-planned-today" : ""}`;
   const check = document.createElement("button");
   check.className = "check-button";
   check.type = "button";
@@ -381,6 +392,12 @@ function taskCard(item) {
   main.append(title, meta);
   const actions = document.createElement("div");
   actions.className = "card-actions";
+  const plan = document.createElement("button");
+  plan.className = `plan-button${planned ? " is-active" : ""}`;
+  plan.type = "button";
+  plan.setAttribute("aria-label", planned ? "Убрать из плана на сегодня" : "Собираюсь сделать сегодня");
+  plan.textContent = planned ? "★" : "☆";
+  plan.addEventListener("click", () => togglePlanToday(item.id));
   const edit = document.createElement("button");
   edit.className = "edit-button";
   edit.type = "button";
@@ -396,7 +413,7 @@ function taskCard(item) {
   remove.setAttribute("aria-label", "Удалить");
   remove.textContent = "×";
   remove.addEventListener("click", () => deleteItem(item.id));
-  actions.append(edit, remove);
+  actions.append(plan, edit, remove);
   card.append(check, main, actions);
   return card;
 }
@@ -488,6 +505,7 @@ function fromRow(row) {
     active: row.active,
     completedAt: row.completed_at,
     completionDates: row.completion_dates || [],
+    plannedTodayAt: row.planned_today_at,
     createdAt: row.created_at,
   };
 }
@@ -503,6 +521,7 @@ function toRow(item) {
     active: item.active,
     completed_at: item.completedAt,
     completion_dates: item.completionDates || [],
+    planned_today_at: item.plannedTodayAt || null,
     created_at: item.createdAt || new Date().toISOString(),
   };
 }
@@ -515,6 +534,10 @@ function isDoneToday(item) {
   const today = todayISO();
   if (item.type === "habit") return (item.completionDates || []).includes(today);
   return item.completedAt === today;
+}
+
+function isPlannedToday(item) {
+  return item.plannedTodayAt === todayISO();
 }
 
 function urgencyRank(item) {
