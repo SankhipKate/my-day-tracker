@@ -1,8 +1,10 @@
 const state = { items: [] };
 let activeView = "today";
 let todayMode = "urgency";
-let taskGroup = "urgency";
+let savingOrder = false;
 let doneFilter = "all";
+let habitAnchor = new Date();
+let habitPeriod = "week";
 let editingId = "";
 let currentUser = null;
 let supabaseClient = null;
@@ -12,6 +14,17 @@ const urgencyLabels = { high: "Высокая", medium: "Средняя", low: "
 const urgencyOrder = ["high", "medium", "low"];
 
 document.addEventListener("DOMContentLoaded", async () => {
+  let displayedDay = todayISO();
+  function refreshDay() {
+    const day = todayISO();
+    if (day !== displayedDay) {
+      if (toISO(habitAnchor) === displayedDay) habitAnchor = new Date();
+      displayedDay = day;
+      render();
+    }
+  }
+  window.setInterval(refreshDay, 30000);
+  document.addEventListener("visibilitychange", refreshDay);
   registerServiceWorker();
   setupSupabase();
   bindEvents();
@@ -47,6 +60,16 @@ async function initAuth() {
 }
 
 function bindEvents() {
+  document.querySelector("#habitPeriod").onchange = (event) => {
+    habitPeriod = event.target.value;
+    renderHabits();
+  };
+  document.querySelector("#previousPeriod").onclick = () => moveHabitPeriod(-1);
+  document.querySelector("#nextPeriod").onclick = () => moveHabitPeriod(1);
+  document.querySelector("#currentPeriod").onclick = () => {
+    habitAnchor = new Date();
+    renderHabits();
+  };
   document.querySelector("#authForm").addEventListener("submit", authWithEmail);
   document.querySelector("#signOut").addEventListener("click", signOut);
 
@@ -64,13 +87,6 @@ function bindEvents() {
     });
   });
 
-  document.querySelectorAll("[data-task-group]").forEach((button) => {
-    button.addEventListener("click", () => {
-      taskGroup = button.dataset.taskGroup;
-      render();
-    });
-  });
-
   document.querySelectorAll("[data-done-filter]").forEach((button) => {
     button.addEventListener("click", () => {
       doneFilter = button.dataset.doneFilter;
@@ -84,6 +100,11 @@ function bindEvents() {
     openDialog(dialog);
     document.querySelector("#taskTitle").focus();
   });
+  document.querySelector("#closeForm").onclick = () => closeDialog(dialog);
+  const archiveButton = document.querySelector("#archiveItem");
+  archiveButton.onclick = async () => {
+    if (await setArchived(editingId, true, archiveButton)) closeDialog(dialog);
+  };
   dialog.addEventListener("close", () => dialog.classList.remove("is-fallback-open"));
 
   document.querySelector("#clearCategory").addEventListener("click", () => {
@@ -144,13 +165,16 @@ async function loadCloudState() {
   setStatus("");
 }
 
-async function saveItem(item) {
+async function saveItem(item, importing = false) {
   if (!supabaseClient || !currentUser) return;
-  const { error } = await supabaseClient.from("tracker_items").upsert(toRow(item));
+  const row = toRow(item);
+  if (importing && Number.isInteger(item.habitOrder)) row.habit_order = item.habitOrder;
+  const { error } = await supabaseClient.from("tracker_items").upsert(row);
   if (error) setStatus(error.message);
 }
 
 function prepareCreateForm() {
+  document.querySelector("#archiveItem").classList.add("is-hidden");
   editingId = "";
   document.querySelector("#dialogTitle").textContent = "Новая запись";
   document.querySelector("#saveButton").textContent = "Добавить";
@@ -165,6 +189,7 @@ function prepareCreateForm() {
 function prepareEditForm(id) {
   const item = state.items.find((entry) => entry.id === id);
   if (!item) return;
+  document.querySelector("#archiveItem").classList.remove("is-hidden");
   editingId = id;
   document.querySelector("#dialogTitle").textContent = "Редактировать";
   document.querySelector("#saveButton").textContent = "Сохранить";
@@ -272,16 +297,64 @@ function render() {
   });
   document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === activeView));
   syncChipState("[data-today-mode]", todayMode, "todayMode");
-  syncChipState("[data-task-group]", taskGroup, "taskGroup");
   syncChipState("[data-done-filter]", doneFilter, "doneFilter");
   renderToday();
-  renderTasks();
   renderHabits();
   renderDone();
+  renderArchive("habit");
+  renderArchive("task");
   renderCategorySuggestions();
 }
 
+async function setArchived(id, archived, button) {
+  const item = state.items.find(entry => entry.id === id);
+  if (!item || !supabaseClient || !currentUser) return false;
+  button.disabled = true;
+  try {
+    const { error } = await supabaseClient.from("tracker_items")
+      .update({ archived }).eq("id", id).eq("user_id", currentUser.id).select("id").single();
+    if (error) throw error;
+    item.archived = archived;
+    render();
+    return true;
+  } catch (error) {
+    window.alert("Не удалось изменить архив: " + error.message);
+    return false;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function renderArchive(type) {
+  const items = state.items.filter(item => item.type === type && item.archived);
+  document.querySelector("#" + type + "ArchiveCount").textContent = items.length;
+  const list = document.querySelector("#" + type + "ArchiveList");
+  list.replaceChildren();
+  if (!items.length) list.textContent = "Архив пуст";
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = "archive-row";
+    const name = document.createElement("span");
+    name.textContent = item.title;
+    const dates = item.completionDates || [];
+    if (type === "habit" && dates.length) {
+      const last = [...dates].sort().pop();
+      const info = document.createElement("small");
+      info.textContent = "Последнее выполнение: " + formatLongDate(last);
+      name.append(info);
+    }
+    const restore = document.createElement("button");
+    restore.className = "small-button";
+    restore.textContent = "Вернуть";
+    restore.onclick = () => setArchived(item.id, false, restore);
+    row.append(name, restore);
+    list.append(row);
+  }
+}
+
 function renderToday() {
+  document.querySelector("#taskArchive").hidden = todayMode !== "tasks";
+  document.querySelector("#habitArchive").hidden = todayMode !== "habits";
   const list = document.querySelector("#todayList");
   const items = sortTodayItems(todayItems().filter((item) => {
     if (todayMode === "tasks") return item.type === "task";
@@ -302,53 +375,74 @@ function renderToday() {
   setEmpty("#todayEmpty", items.length === 0);
 }
 
-function renderTasks() {
-  const container = document.querySelector("#tasksList");
-  const tasks = state.items.filter((item) => item.type === "task" && item.active);
-  container.innerHTML = "";
-  if (taskGroup === "urgency") urgencyOrder.forEach((urgency) => appendGroup(container, urgencyLabels[urgency], tasks.filter((item) => item.urgency === urgency)));
-  else {
-    const categories = [...new Set(tasks.map((item) => displayCategory(item.category)))].sort((a, b) => a.localeCompare(b, "ru"));
-    categories.forEach((category) => appendGroup(container, category, tasks.filter((item) => displayCategory(item.category) === category)));
-  }
-  setEmpty("#tasksEmpty", tasks.length === 0);
+function moveHabitPeriod(step) {
+  const year = habitAnchor.getFullYear();
+  const month = habitAnchor.getMonth();
+  if (habitPeriod === "year") habitAnchor = new Date(year + step, month, 1);
+  else if (habitPeriod === "month") habitAnchor = new Date(year, month + step, 1);
+  else habitAnchor.setDate(habitAnchor.getDate() + 7 * step);
+  renderHabits();
 }
 
 function renderHabits() {
   const grid = document.querySelector("#habitGrid");
-  const habits = state.items.filter((item) => item.type === "habit" && item.active);
-  const week = weekDates();
-  document.querySelector("#weekRange").textContent = `${formatShortDate(week[0])} - ${formatShortDate(week[6])}`;
-  grid.innerHTML = "";
-  if (habits.length) {
-    const header = document.createElement("div");
-    header.className = "habit-row";
-    header.appendChild(cell(""));
-    week.forEach((date) => header.appendChild(cell(weekdayLabel(date))));
-    header.appendChild(cell("Итого"));
-    grid.appendChild(header);
+
+  const year = habitAnchor.getFullYear();
+  const month = habitAnchor.getMonth();
+  const annual = habitPeriod === "year";
+  const weekly = habitPeriod === "week";
+  let dates;
+  if (weekly) dates = weekDates(habitAnchor);
+  else {
+    const count = annual ? 12 : new Date(year, month + 1, 0).getDate();
+    dates = Array.from({ length: count }, (_, i) =>
+      toISO(annual ? new Date(year, i, 1) : new Date(year, month, i + 1)));
   }
-  habits.forEach((habit) => {
+  const first = dates[0];
+  const last = annual ? year + "-12-31" : dates[dates.length - 1];
+  const habits = state.items.filter(item => item.type === "habit" && (item.archived
+    ? (item.completionDates || []).some(date => date >= first && date <= last)
+    : item.active));
+  const label = document.querySelector("#weekRange");
+  if (weekly) label.textContent = formatLongDate(dates[0]) + " — " + formatLongDate(dates[6]);
+  else label.textContent = annual ? String(year) : habitAnchor.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  grid.replaceChildren();
+  grid.style.setProperty("--habit-columns", dates.length);
+  function appendRow(title, values, total) {
     const row = document.createElement("div");
     row.className = "habit-row";
-    const name = cell(habit.title);
+    const name = cell(title);
     name.classList.add("habit-name");
-    row.appendChild(name);
+    row.append(name, ...values, cell(total));
+    grid.append(row);
+  }
+  if (habits.length) {
+    appendRow("", dates.map((date, i) => {
+      if (weekly) return cell(weekdayLabel(date));
+      if (annual) return cell(new Date(year, i, 1).toLocaleDateString("ru-RU", { month: "short" }));
+      return cell(String(i + 1));
+    }), "Итого");
+  }
+  for (const habit of habits) {
+    const counts = new Map();
+    for (const date of new Set(habit.completionDates || [])) {
+      const key = annual ? date.slice(0, 7) : date;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
     let total = 0;
-    week.forEach((date) => {
-      const done = (habit.completionDates || []).includes(date);
-      if (done) total += 1;
+    const values = dates.map(date => {
+      const n = counts.get(annual ? date.slice(0, 7) : date) || 0;
+      total += n;
+      if (annual) return cell(String(n));
       const wrapper = cell("");
       const dot = document.createElement("span");
-      dot.className = `habit-dot${done ? " is-done" : ""}`;
-      wrapper.appendChild(dot);
-      row.appendChild(wrapper);
+      dot.className = "habit-dot" + (n ? " is-done" : "");
+      wrapper.setAttribute("aria-label", formatLongDate(date) + (n ? ", выполнено" : ", без отметки"));
+      wrapper.append(dot);
+      return wrapper;
     });
-    const totalCell = cell(`${total}/7`);
-    totalCell.classList.add("habit-total");
-    row.appendChild(totalCell);
-    grid.appendChild(row);
-  });
+    appendRow(habit.title, values, weekly ? total + "/7" : String(total));
+  }
   setEmpty("#habitsEmpty", habits.length === 0);
 }
 
@@ -414,6 +508,11 @@ function taskCard(item) {
   remove.textContent = "×";
   remove.addEventListener("click", () => deleteItem(item.id));
   actions.append(plan, edit, remove);
+  if (todayMode === "habits" && item.type === "habit") {
+    card.dataset.habitId = item.id;
+    card.dataset.done = String(done);
+    actions.append(habitHandle(item, card));
+  }
   card.append(check, main, actions);
   return card;
 }
@@ -468,13 +567,99 @@ function renderCategorySuggestions() {
 }
 
 function todayItems() {
-  return state.items.filter((item) => item.type === "habit" ? item.active : item.active || item.completedAt === todayISO());
+  return state.items.filter((item) => !item.archived && (item.active || (item.type === "task" && item.completedAt === todayISO())));
+}
+
+function compareHabitOrder(a, b) {
+  const rank = (a.habitOrder ?? Infinity) - (b.habitOrder ?? Infinity);
+  return rank || (b.createdAt || "").localeCompare(a.createdAt || "") || a.id.localeCompare(b.id);
+}
+
+async function moveHabit(id, targetId, after) {
+  if (savingOrder || !currentUser || id === targetId) return;
+  const habits = state.items.filter(item => item.type === "habit").sort(compareHabitOrder);
+  const moved = habits.find(item => item.id === id);
+  const ordered = habits.filter(item => item.id !== id);
+  const index = ordered.findIndex(item => item.id === targetId);
+  if (!moved || index < 0) return;
+  ordered.splice(index + Number(after), 0, moved);
+  if (ordered.every((item, i) => item === habits[i])) return;
+  savingOrder = true;
+  try {
+    const { error } = await supabaseClient.rpc("set_tracker_habit_order", { ids: ordered.map(item => item.id) });
+    if (error) throw error;
+    const ranks = new Map(ordered.map((item, i) => [item.id, i + 1]));
+    for (const item of state.items) {
+      if (ranks.has(item.id)) item.habitOrder = ranks.get(item.id);
+    }
+  } catch (error) {
+    window.alert("Не удалось сохранить порядок: " + error.message);
+  } finally {
+    savingOrder = false;
+    renderToday();
+  }
+}
+
+function habitHandle(item, card) {
+  const handle = document.createElement("button");
+  handle.type = "button";
+  handle.className = "habit-handle";
+  handle.textContent = "≡";
+  handle.setAttribute("aria-label", "Переместить: " + item.title);
+  handle.onpointerdown = event => {
+    if (!event.isPrimary || event.button !== 0 || savingOrder) return;
+    event.preventDefault();
+    const pointer = event.pointerId;
+    const group = [...card.parentElement.children].filter(row => row.dataset.done === card.dataset.done);
+    handle.setPointerCapture(pointer);
+    card.classList.add("drag-source");
+    let y = event.clientY;
+    let target = null;
+    let after = false;
+    let frame;
+    function mark() {
+      target?.classList.remove("drop-before", "drop-after");
+      target = group.find(row => y < row.getBoundingClientRect().bottom) || group[group.length - 1];
+      const rect = target.getBoundingClientRect();
+      after = y >= rect.top + rect.height / 2;
+      if (target !== card) target.classList.add(after ? "drop-after" : "drop-before");
+    }
+    function track() {
+      if (y < 64) window.scrollBy(0, -8);
+      else if (y > window.innerHeight - 96) window.scrollBy(0, 8);
+      mark();
+      frame = requestAnimationFrame(track);
+    }
+    handle.onpointermove = e => {
+      if (e.pointerId !== pointer) return;
+      y = e.clientY;
+      if (!frame) track();
+    };
+    function finish(e) {
+      if (e.pointerId !== pointer) return;
+      cancelAnimationFrame(frame);
+      card.classList.remove("drag-source");
+      target?.classList.remove("drop-before", "drop-after");
+      handle.onpointermove = handle.onpointerup = handle.onpointercancel = handle.onlostpointercapture = null;
+      if (e.type === "pointerup" && target) moveHabit(item.id, target.dataset.habitId, after);
+    }
+    handle.onpointerup = handle.onpointercancel = handle.onlostpointercapture = finish;
+  };
+  handle.onkeydown = event => {
+    if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    const down = event.key === "ArrowDown";
+    const target = down ? card.nextElementSibling : card.previousElementSibling;
+    if (target && target.dataset.done === card.dataset.done) moveHabit(item.id, target.dataset.habitId, down);
+  };
+  return handle;
 }
 
 function sortTodayItems(items) {
   return [...items].sort((a, b) => {
     const doneDiff = Number(isDoneToday(a)) - Number(isDoneToday(b));
     if (doneDiff !== 0) return doneDiff;
+    if (todayMode === "habits") return compareHabitOrder(a, b);
     if (todayMode === "category") {
       const categoryDiff = displayCategory(a.category).localeCompare(displayCategory(b.category), "ru");
       if (categoryDiff !== 0) return categoryDiff;
@@ -502,6 +687,8 @@ function fromRow(row) {
     title: row.title,
     category: row.category || "",
     urgency: row.urgency || "medium",
+    habitOrder: row.habit_order,
+    archived: row.archived === true,
     active: row.active,
     completedAt: row.completed_at,
     completionDates: row.completion_dates || [],
@@ -518,6 +705,7 @@ function toRow(item) {
     title: item.title,
     category: item.category || null,
     urgency: item.urgency || "medium",
+    archived: item.archived === true,
     active: item.active,
     completed_at: item.completedAt,
     completion_dates: item.completionDates || [],
@@ -545,8 +733,7 @@ function urgencyRank(item) {
   return index === -1 ? 1 : index;
 }
 
-function weekDates() {
-  const now = new Date();
+function weekDates(now) {
   const start = new Date(now);
   const mondayOffset = (now.getDay() + 6) % 7;
   start.setDate(now.getDate() - mondayOffset);
@@ -655,7 +842,7 @@ function importData(event) {
       const nextState = parsed.state && Array.isArray(parsed.state.items) ? parsed.state : parsed;
       if (!Array.isArray(nextState.items)) return;
       for (const item of nextState.items) {
-        await saveItem({ ...item, completionDates: item.completionDates || [], createdAt: item.createdAt || new Date().toISOString() });
+        await saveItem({ ...item, completionDates: item.completionDates || [], createdAt: item.createdAt || new Date().toISOString() }, true);
       }
       await loadCloudState();
       render();

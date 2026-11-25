@@ -42,3 +42,15 @@ create policy "Users can delete own tracker items"
 on public.tracker_items for delete
 to authenticated
 using (auth.uid() = user_id);
+
+alter table public.tracker_items add column if not exists archived boolean not null default false;
+
+alter table public.tracker_items add column if not exists habit_order integer;
+
+create or replace function public.set_tracker_habit_order(ids uuid[])
+returns void language sql security invoker set search_path = '' as $$
+  update public.tracker_items as item
+  set habit_order = ordered.position::integer
+  from unnest(ids) with ordinality as ordered(id, position)
+  where item.id = ordered.id and item.user_id = auth.uid() and item.type = 'habit';
+$$;
