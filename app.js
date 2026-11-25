@@ -1,6 +1,6 @@
 const state = { items: [] };
 let activeView = "today";
-let todayMode = "urgency";
+let todayMode = "habits";
 let savingOrder = false;
 let doneFilter = "all";
 let habitAnchor = new Date();
@@ -101,6 +101,33 @@ function bindEvents() {
     document.querySelector("#taskTitle").focus();
   });
   document.querySelector("#closeForm").onclick = () => closeDialog(dialog);
+  const confirmation = document.querySelector("#deleteDialog");
+  const confirmButton = document.querySelector("#confirmDelete");
+  document.querySelector("#deleteItemButton").onclick = () => {
+    const item = state.items.find(entry => entry.id === editingId);
+    if (!item) return;
+    const habit = item.type === "habit";
+    confirmButton.textContent = habit ? "Удалить привычку" : "Удалить задачу";
+    document.querySelector("#deleteQuestion").textContent =
+      confirmButton.textContent + " «" + item.title + "»" + (habit ? " и все её отметки выполнения?" : "?");
+    openDialog(confirmation);
+    document.querySelector("#cancelDelete").focus();
+  };
+  document.querySelector("#cancelDelete").onclick = () => closeDialog(confirmation);
+  confirmButton.onclick = async () => {
+    if (confirmButton.disabled) return;
+    confirmButton.disabled = true;
+    const id = editingId;
+    closeDialog(confirmation);
+    closeDialog(dialog);
+    try {
+      await deleteItem(id);
+    } catch (error) {
+      window.alert("Не удалось удалить запись: " + error.message);
+    } finally {
+      confirmButton.disabled = false;
+    }
+  };
   const archiveButton = document.querySelector("#archiveItem");
   archiveButton.onclick = async () => {
     if (await setArchived(editingId, true, archiveButton)) closeDialog(dialog);
@@ -175,6 +202,7 @@ async function saveItem(item, importing = false) {
 
 function prepareCreateForm() {
   document.querySelector("#archiveItem").classList.add("is-hidden");
+  document.querySelector("#deleteItemButton").classList.add("is-hidden");
   editingId = "";
   document.querySelector("#dialogTitle").textContent = "Новая запись";
   document.querySelector("#saveButton").textContent = "Добавить";
@@ -190,6 +218,7 @@ function prepareEditForm(id) {
   const item = state.items.find((entry) => entry.id === id);
   if (!item) return;
   document.querySelector("#archiveItem").classList.remove("is-hidden");
+  document.querySelector("#deleteItemButton").classList.remove("is-hidden");
   editingId = id;
   document.querySelector("#dialogTitle").textContent = "Редактировать";
   document.querySelector("#saveButton").textContent = "Сохранить";
@@ -275,13 +304,11 @@ async function togglePlanToday(id) {
 }
 
 async function deleteItem(id) {
-  const index = state.items.findIndex((entry) => entry.id === id);
-  if (index < 0) return;
-  state.items.splice(index, 1);
-  if (supabaseClient) {
-    const { error } = await supabaseClient.from("tracker_items").delete().eq("id", id);
-    if (error) setStatus(error.message);
-  }
+  if (!id || !supabaseClient || !currentUser) throw new Error("Требуется вход.");
+  const { error } = await supabaseClient.from("tracker_items").delete()
+    .eq("id", id).eq("user_id", currentUser.id).select("id").single();
+  if (error) throw error;
+  state.items = state.items.filter(item => item.id !== id);
   render();
 }
 
@@ -496,18 +523,12 @@ function taskCard(item) {
   edit.className = "edit-button";
   edit.type = "button";
   edit.setAttribute("aria-label", "Редактировать");
-  edit.textContent = "Edit";
+  edit.textContent = "✎";
   edit.addEventListener("click", () => {
     prepareEditForm(item.id);
     openDialog(document.querySelector("#taskDialog"));
   });
-  const remove = document.createElement("button");
-  remove.className = "delete-button";
-  remove.type = "button";
-  remove.setAttribute("aria-label", "Удалить");
-  remove.textContent = "×";
-  remove.addEventListener("click", () => deleteItem(item.id));
-  actions.append(plan, edit, remove);
+  actions.append(plan, edit);
   if (todayMode === "habits" && item.type === "habit") {
     card.dataset.habitId = item.id;
     card.dataset.done = String(done);
