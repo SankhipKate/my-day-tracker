@@ -12,15 +12,14 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <h1 id="todayLabel">Сегодня</h1>
-        </div>
+        <span class="app-version">v1.1.0</span>
         <div class="top-actions">
           <button class="small-button" id="exportData" type="button">Export</button>
           <button class="small-button" id="importData" type="button">Import</button>
           <button class="small-button is-hidden" id="signOut" type="button">Выйти</button>
-          <button class="icon-button" id="openAddDialog" aria-label="Добавить">+</button>
         </div>
+        <h1 id="todayLabel">Сегодня</h1>
+        <button class="icon-button" id="openAddDialog" aria-label="Добавить">+</button>
       </header>
 
       <section class="auth-loading" id="authLoading">
@@ -52,8 +51,8 @@
 
           <div class="quick-filters today-modes" aria-label="Режим сегодня">
             <button class="chip task-mode" data-today-mode="tasks">Задачи</button>
-            <button class="chip habit-mode" data-today-mode="habits">Привычки</button>
-            <button class="chip is-active" data-today-mode="urgency">Срочность</button>
+            <button class="chip habit-mode is-active" data-today-mode="habits">Привычки</button>
+            <button class="chip" data-today-mode="urgency">Срочность</button>
             <button class="chip" data-today-mode="category">Категории</button>
           </div>
 
@@ -166,7 +165,18 @@
           <button class="ghost-button" id="clearCategory" type="button">Очистить категорию</button>
           <button class="primary-button" id="saveButton" value="default">Добавить</button>
         </div>
+        <button type="button" class="ghost-button is-hidden" id="deleteItemButton">Удалить</button>
       </form>
+    </dialog>
+
+    <dialog class="task-dialog" id="deleteDialog" aria-labelledby="deleteQuestion">
+      <div class="delete-confirmation">
+        <p id="deleteQuestion"></p>
+        <div class="dialog-actions">
+          <button type="button" class="ghost-button" id="cancelDelete" autofocus>Отмена</button>
+          <button type="button" class="ghost-button" id="confirmDelete"></button>
+        </div>
+      </div>
     </dialog>
 
     <input id="backupFile" type="file" accept="application/json,.json" hidden>
