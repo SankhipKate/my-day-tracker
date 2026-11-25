@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#eef3f1">
     <title>Сегодня</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="apple-touch-icon" href="./icons/icon-192.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="./icons/checklist-180.png">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
@@ -62,37 +62,34 @@
             <h3>На сегодня пусто</h3>
             <p>Добавь разовую задачу или ежедневную привычку.</p>
           </div>
-        </section>
-
-        <section class="view" id="viewTasks" aria-labelledby="tasksTitle">
-          <div class="section-heading">
-            <h2 id="tasksTitle">Задачи</h2>
-            <span>активные</span>
-          </div>
-
-          <div class="quick-filters" aria-label="Группировка задач">
-            <button class="chip is-active" data-task-group="urgency">Разложить по срочности</button>
-            <button class="chip" data-task-group="category">Разложить по категориям</button>
-          </div>
-
-          <div id="tasksList"></div>
-          <div class="empty-state" id="tasksEmpty">
-            <h3>Активных задач нет</h3>
-            <p>Разовые задачи появятся здесь до выполнения.</p>
-          </div>
+        <details class="archive" id="taskArchive" hidden>
+            <summary>Архив задач (<span id="taskArchiveCount">0</span>)</summary>
+            <div id="taskArchiveList"></div>
+          </details>
+          <details class="archive" id="habitArchive" hidden>
+            <summary>Архив привычек (<span id="habitArchiveCount">0</span>)</summary>
+            <div id="habitArchiveList"></div>
+          </details>
         </section>
 
         <section class="view" id="viewHabits" aria-labelledby="habitsTitle">
           <div class="section-heading">
-            <h2 id="habitsTitle">Привычки</h2>
+            <h2 id="habitsTitle">Статистика</h2>
             <span id="weekRange"></span>
           </div>
 
+          <div class="quick-filters" aria-label="Период">
+            <label>Вид <select id="habitPeriod"><option value="week">Неделя</option><option value="month">Месяц</option><option value="year">Год</option></select></label>
+            <button class="chip" id="previousPeriod" aria-label="Предыдущий период">←</button>
+            <button class="chip" id="currentPeriod">Сегодня</button>
+            <button class="chip" id="nextPeriod" aria-label="Следующий период">→</button>
+          </div>
           <div class="habit-grid" id="habitGrid"></div>
           <div class="empty-state" id="habitsEmpty">
             <h3>Привычек пока нет</h3>
             <p>Добавь ежедневную привычку, и здесь появится неделя.</p>
           </div>
+        
         </section>
 
         <section class="view" id="viewDone" aria-labelledby="doneTitle">
@@ -118,8 +115,7 @@
 
     <nav class="tabbar" aria-label="Разделы">
       <button class="tab is-active" data-view="today">Сегодня</button>
-      <button class="tab" data-view="tasks">Задачи</button>
-      <button class="tab" data-view="habits">Привычки</button>
+      <button class="tab" data-view="habits">Статистика</button>
       <button class="tab" data-view="done">Выполнено</button>
     </nav>
 
@@ -127,7 +123,7 @@
       <form method="dialog" id="taskForm">
         <div class="dialog-header">
           <h2 id="dialogTitle">Новая запись</h2>
-          <button class="ghost-button" value="cancel" aria-label="Закрыть">Закрыть</button>
+          <button class="ghost-button" id="closeForm" type="button" aria-label="Закрыть">Закрыть</button>
         </div>
 
         <input id="editingId" name="editingId" type="hidden">
@@ -166,6 +162,7 @@
         </label>
 
         <div class="dialog-actions">
+          <button class="ghost-button is-hidden" type="button" id="archiveItem">В архив</button>
           <button class="ghost-button" id="clearCategory" type="button">Очистить категорию</button>
           <button class="primary-button" id="saveButton" value="default">Добавить</button>
         </div>

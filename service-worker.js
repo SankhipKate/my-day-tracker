@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-day-tracker-cloud-v2";
+const CACHE_NAME = "my-day-tracker-cloud-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -6,8 +6,9 @@ const APP_SHELL = [
   "./app.js",
   "./supabase-config.js",
   "./manifest.webmanifest",
-  "./icons/icon-192.svg",
-  "./icons/icon-512.svg",
+  "./icons/checklist-180.png",
+  "./icons/checklist-192.png",
+  "./icons/checklist-512.png",
 ];
 
 self.addEventListener("install", (event) => {

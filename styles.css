@@ -382,9 +382,9 @@ h3 {
 
 .habit-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) repeat(7, 42px) 54px;
+  grid-template-columns: minmax(120px, 1.2fr) repeat(var(--habit-columns, 7), 42px) 54px;
   align-items: center;
-  min-width: 500px;
+  min-width: max-content;
   border-bottom: 1px solid var(--line);
 }
 
@@ -437,7 +437,7 @@ h3 {
   bottom: 0;
   left: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   width: min(720px, 100%);
   margin: 0 auto;
@@ -624,3 +624,13 @@ select {
     font-size: 13px;
   }
 }
+
+.archive { margin-top: 16px; }
+.archive summary { cursor: pointer; padding: 12px 0; font-weight: 700; }
+.archive-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.archive-row small { display: block; color: var(--muted); }
+
+.habit-handle { touch-action: none; cursor: grab; min-height: 40px; min-width: 32px; background: transparent; color: var(--muted); border: 0; font-size: 22px; }
+.drag-source { opacity: .65; }
+.drop-before { box-shadow: inset 0 3px var(--accent); }
+.drop-after { box-shadow: inset 0 -3px var(--accent); }
