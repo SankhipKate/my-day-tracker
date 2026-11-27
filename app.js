@@ -328,6 +328,7 @@ async function deleteItem(id) {
     .eq("id", id).eq("user_id", currentUser.id).select("id").single();
   if (error) throw error;
   state.items = state.items.filter(item => item.id !== id);
+  daySlots = daySlots.filter(slot => slot.habit_id !== id);
   render();
 }
 

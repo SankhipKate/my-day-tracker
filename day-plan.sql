@@ -20,8 +20,9 @@ language plpgsql security invoker set search_path = '' as $$
 begin
   if new.habit_id is not null then
     perform 1 from public.tracker_items where id = new.habit_id and user_id = new.user_id
-      and type = 'habit' and active and not archived and planned_today_at = new.day for share;
-    if not found then raise exception 'Обнови список выбранных привычек'; end if;
+      and not archived and planned_today_at = new.day
+      and (active or (type = 'task' and completed_at = new.day)) for share;
+    if not found then raise exception 'Обнови список дел на сегодня'; end if;
   end if;
   return new;
 end $$;
@@ -36,6 +37,7 @@ begin
 end $$;
 drop trigger if exists clear_tracker_slot on public.tracker_items;
 create trigger clear_tracker_slot after update on public.tracker_items for each row
-when (old.planned_today_at is distinct from new.planned_today_at or new.archived or not new.active or new.type <> 'habit')
+when (old.planned_today_at is distinct from new.planned_today_at or new.archived
+  or (not new.active and (new.type <> 'task' or new.completed_at is distinct from new.planned_today_at)))
 execute function public.clear_tracker_slot();
 commit;

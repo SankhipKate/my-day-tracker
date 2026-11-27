@@ -6,7 +6,7 @@ let writingSlot = false;
 const planHours = Array.from({ length: 26 }, (_, index) => index / 2 + 8);
 const planEl = id => document.getElementById(id);
 const hourLabel = hour => String(Math.floor(hour)).padStart(2, "0") + (hour % 1 ? ":30" : ":00");
-const intervalLabel = hour => hourLabel(hour) + "–" + hourLabel(hour + 0.5);
+const intervalLabel = (hour, minutes = 30) => hourLabel(hour) + "–" + hourLabel(hour + minutes / 60);
 
 function fitsSlot(start, minutes, original) {
   const end = start + minutes / 60;
@@ -41,45 +41,47 @@ function renderDayPlan() {
     root.append("Не удалось загрузить расписание. ", retry);
     return;
   }
-  const habits = todayItems().filter(item => item.type === "habit" && isPlannedToday(item)).sort(compareHabitOrder);
-  const pending = habits.filter(item => !daySlots.some(slot => slot.habit_id === item.id));
+  const planned = todayItems().filter(isPlannedToday).sort(compareHabitOrder);
+  const pending = planned.filter(item => !daySlots.some(slot => slot.habit_id === item.id));
   const subtitle = document.createElement("h3");
   subtitle.textContent = "Без времени";
   const pool = document.createElement("div");
   pool.className = "plan-list";
-  if (!pending.length) pool.textContent = habits.length ? "Все выбранные привычки распределены." : "Выбери привычки звёздочкой в разделе «Привычки».";
+  if (!pending.length) pool.textContent = planned.length ? "Все выбранные дела распределены." : "Отметь звёздочкой задачу или привычку на сегодня.";
   for (const item of pending) pool.append(planRow(null, null, item));
   const schedule = document.createElement("h3");
   schedule.textContent = "Расписание";
   const grid = document.createElement("div");
-  grid.className = "plan-list";
+  grid.className = "plan-list plan-schedule";
   for (const hour of planHours) {
     const slot = daySlots.find(entry => entry.hour <= hour && hour < entry.hour + entry.minutes / 60);
-    grid.append(planRow(hour, slot, habits.find(item => item.id === slot?.habit_id)));
+    if (slot && slot.hour !== hour) continue;
+    grid.append(planRow(hour, slot, planned.find(item => item.id === slot?.habit_id)));
   }
   root.append(subtitle, pool, schedule, grid);
 }
 
-function planRow(hour, slot, habit) {
+function planRow(hour, slot, item) {
   const row = document.createElement("div");
-  const done = habit && isDoneToday(habit);
-  row.className = "plan-row" + (habit ? " habit" : "") + (done ? " done" : "");
-  const edit = { day: todayISO(), owner: currentUser?.id, hour: slot?.hour ?? hour, slot, habit };
+  const done = item && isDoneToday(item);
+  row.className = "plan-row" + (item ? " " + item.type : "") + (done ? " done" : "");
+  const edit = { day: todayISO(), owner: currentUser?.id, hour: slot?.hour ?? hour, slot, item };
   const label = document.createElement("button");
   label.className = "plan-label";
   label.onclick = () => editSlot(edit);
   if (hour !== null) {
     const time = document.createElement("time");
-    time.textContent = intervalLabel(hour);
+    time.textContent = intervalLabel(hour, slot?.minutes);
+    if (slot?.minutes === 60) row.classList.add("plan-hour");
     label.append(time);
     row.dataset.startHour = hour;
     if (!slot) row.dataset.freeHour = hour;
   }
   const title = document.createElement("span");
-  title.textContent = (done ? "✓ " : "") + (habit?.title || slot?.note || "Свободно");
+  title.textContent = (done ? "✓ " : "") + (item?.title || slot?.note || "Свободно");
   label.append(title);
   row.append(label);
-  if (habit || slot) {
+  if (item || slot) {
     const grip = document.createElement("button");
     grip.className = "plan-grip";
     grip.textContent = "⠿";
@@ -94,7 +96,7 @@ function planRow(hour, slot, habit) {
 function bindSlotDrag(row, grip, edit) {
   let suppressClick = false;
   const minutes = edit.slot?.minutes || 30;
-  const title = edit.habit?.title || edit.slot?.note;
+  const title = edit.item?.title || edit.slot?.note;
   grip.onclick = () => editSlot(edit);
   row.addEventListener("click", event => {
     if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); }
@@ -102,10 +104,16 @@ function bindSlotDrag(row, grip, edit) {
   function begin(x, y, immediate) {
     let frame, timer, ghost, target, moved = false;
     const startX = x, startY = y;
+    function dropHour() {
+      const start = Number(target.dataset.startHour);
+      if (target !== row || edit.slot?.minutes !== 60) return start;
+      const rect = target.getBoundingClientRect();
+      return y >= rect.top + rect.height / 2 ? start + 0.5 : start;
+    }
     function mark() {
       target?.classList.remove("plan-target");
       target = document.elementFromPoint(x, y)?.closest("[data-start-hour]");
-      if (target && !fitsSlot(Number(target.dataset.startHour), minutes, edit.slot)) target = null;
+      if (target && !fitsSlot(dropHour(), minutes, edit.slot)) target = null;
       target?.classList.add("plan-target");
     }
     function paint() {
@@ -136,7 +144,7 @@ function bindSlotDrag(row, grip, edit) {
         clearTimeout(timer);
         cancelAnimationFrame(frame);
         if (ghost) mark();
-        const hour = target ? Number(target.dataset.startHour) : null;
+        const hour = target ? dropHour() : null;
         suppressClick = Boolean(ghost && moved);
         setTimeout(() => { suppressClick = false; }, 400);
         target?.classList.remove("plan-target");
@@ -189,9 +197,9 @@ function bindSlotDrag(row, grip, edit) {
 
 function editSlot(edit) {
   slotEdit = edit;
-  planEl("slotTitle").textContent = edit.habit?.title || (edit.slot ? "Изменить запись" : "Новая запись");
-  planEl("noteLabel").hidden = Boolean(edit.habit);
-  planEl("slotNote").required = !edit.habit;
+  planEl("slotTitle").textContent = edit.item?.title || (edit.slot ? "Изменить запись" : "Новая запись");
+  planEl("noteLabel").hidden = Boolean(edit.item);
+  planEl("slotNote").required = !edit.item;
   planEl("slotNote").value = edit.slot?.note || "";
   const select = planEl("slotHour");
   const duration = planEl("slotMinutes");
@@ -201,7 +209,7 @@ function editSlot(edit) {
     const minutes = Number(duration.value);
     for (const hour of planHours) {
       if (fitsSlot(hour, minutes, edit.slot))
-        select.add(new Option(hourLabel(hour) + "–" + hourLabel(hour + minutes / 60), hour));
+        select.add(new Option(intervalLabel(hour, minutes), hour));
     }
     if (preferred != null && fitsSlot(Number(preferred), minutes, edit.slot)) select.value = preferred;
     planEl("slotForm").querySelector(".primary-button").disabled = !select.options.length;
@@ -209,28 +217,28 @@ function editSlot(edit) {
   duration.onchange = () => updateHours(select.value || edit.hour);
   updateHours(edit.hour);
   planEl("slotRemove").hidden = !edit.slot;
-  planEl("slotRemove").textContent = edit.habit ? "Убрать время" : "Удалить запись";
-  planEl("slotUnstar").hidden = !edit.habit;
+  planEl("slotRemove").textContent = edit.item ? "Убрать время" : "Удалить запись";
+  planEl("slotUnstar").hidden = !edit.item;
   openDialog(planEl("slotDialog"));
 }
 
 async function writeSlot(edit, hour, note, unstar = false, minutes = edit.slot?.minutes || 30) {
   if (writingSlot || !currentUser || currentUser.id !== edit.owner || edit.day !== todayISO()) return;
-  if (!edit.habit && hour !== null && !note) { planEl("slotNote").focus(); return; }
+  if (!edit.item && hour !== null && !note) { planEl("slotNote").focus(); return; }
   writingSlot = true;
   try {
     if (unstar) {
       const result = await supabaseClient.from("tracker_items").update({ planned_today_at: null })
-        .eq("id", edit.habit.id).eq("user_id", edit.owner).eq("planned_today_at", edit.day).select("id").single();
+        .eq("id", edit.item.id).eq("user_id", edit.owner).eq("planned_today_at", edit.day).select("id").single();
       if (result.error) throw result.error;
     } else {
       const table = supabaseClient.from("tracker_day_slots");
-      const values = { hour, minutes, note: edit.habit ? null : note, habit_id: edit.habit?.id || null };
+      const values = { hour, minutes, note: edit.item ? null : note, habit_id: edit.item?.id || null };
       let query;
       if (edit.slot) {
         query = hour === null ? table.delete() : table.update(values);
         query = query.eq("user_id", edit.owner).eq("day", edit.day).eq("hour", edit.slot.hour).eq("minutes", edit.slot.minutes);
-        query = edit.habit ? query.eq("habit_id", edit.habit.id) : query.eq("note", edit.slot.note);
+        query = edit.item ? query.eq("habit_id", edit.item.id) : query.eq("note", edit.slot.note);
       } else {
         query = table.insert({ ...values, day: edit.day, user_id: edit.owner });
       }
@@ -239,7 +247,7 @@ async function writeSlot(edit, hour, note, unstar = false, minutes = edit.slot?.
     }
     if (planEl("slotDialog").open) closeDialog(planEl("slotDialog"));
   } catch (error) {
-    window.alert("Не удалось сохранить изменение. " + (["23505", "23P01"].includes(error.code) ? "Этот час или привычка уже заняты." : error.message));
+    window.alert("Не удалось сохранить изменение. " + (["23505", "23P01"].includes(error.code) ? "Время занято или у дела уже есть место в расписании." : error.message));
     if (planEl("slotDialog").open) closeDialog(planEl("slotDialog"));
   } finally {
     try { await loadCloudState(); render(); } finally { writingSlot = false; }

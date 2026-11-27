@@ -661,6 +661,8 @@ select {
 #dayPlan { margin-top: 1rem; }
 #dayPlan h2, #dayPlan h3 { margin: .8rem 0 .5rem; }
 .plan-list { display: grid; gap: 5px; }
+.plan-schedule { grid-auto-rows: minmax(46px, auto); }
+.plan-hour { grid-row: span 2; }
 .plan-row { display: flex; align-items: stretch; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
 .plan-row.habit { background: var(--habit-bg); }
 .plan-row button { background: transparent; border: 0; color: inherit; padding: 10px; min-height: 44px; }
