@@ -1,6 +1,6 @@
 const state = { items: [] };
 let activeView = "today";
-let todayMode = "habits";
+let todayMode = "plan";
 let savingOrder = false;
 let doneFilter = "all";
 let habitAnchor = new Date();
@@ -20,6 +20,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (day !== displayedDay) {
       if (toISO(habitAnchor) === displayedDay) habitAnchor = new Date();
       displayedDay = day;
+      daySlots = [];
+      todayMode = "plan";
+      if (document.querySelector("#slotDialog").open) closeDialog(document.querySelector("#slotDialog"));
+      loadCloudState().then(render);
       render();
     }
   }
@@ -49,17 +53,17 @@ async function initAuth() {
   }
   const { data } = await supabaseClient.auth.getSession();
   currentUser = data.session?.user || null;
-  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
     currentUser = session?.user || null;
     authReady = true;
-    await loadCloudState();
-    render();
+    setTimeout(() => loadCloudState().then(render), 0);
   });
   await loadCloudState();
   authReady = true;
 }
 
 function bindEvents() {
+  bindDayPlan();
   document.querySelector("#habitPeriod").onchange = (event) => {
     habitPeriod = event.target.value;
     renderHabits();
@@ -82,7 +86,7 @@ function bindEvents() {
 
   document.querySelectorAll("[data-today-mode]").forEach((button) => {
     button.addEventListener("click", () => {
-      todayMode = button.dataset.todayMode;
+      todayMode = todayMode === button.dataset.todayMode ? "plan" : button.dataset.todayMode;
       render();
     });
   });
@@ -181,15 +185,24 @@ async function signOut() {
 }
 
 async function loadCloudState() {
-  state.items = [];
-  if (!supabaseClient || !currentUser) return;
-  const { data, error } = await supabaseClient.from("tracker_items").select("*").order("created_at", { ascending: false });
-  if (error) {
-    setStatus(error.message);
+  const request = ++cloudRequest;
+  const user = currentUser;
+  const day = todayISO();
+  if (!supabaseClient || !user) {
+    state.items = [];
+    daySlots = [];
+    slotsError = "";
     return;
   }
-  state.items = data.map(fromRow);
-  setStatus("");
+  const [items, slots] = await Promise.all([
+    supabaseClient.from("tracker_items").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+    supabaseClient.from("tracker_day_slots").select("hour,habit_id,note").eq("user_id", user.id).eq("day", day)
+  ]);
+  if (request !== cloudRequest || user.id !== currentUser?.id || day !== todayISO()) return;
+  state.items = (items.data || []).map(fromRow);
+  daySlots = slots.data || [];
+  slotsError = items.error?.message || slots.error?.message || "";
+  setStatus(items.error?.message || "");
 }
 
 async function saveItem(item, importing = false) {
@@ -197,6 +210,7 @@ async function saveItem(item, importing = false) {
   const row = toRow(item);
   if (importing && Number.isInteger(item.habitOrder)) row.habit_order = item.habitOrder;
   const { error } = await supabaseClient.from("tracker_items").upsert(row);
+  if (error && importing) throw error;
   if (error) setStatus(error.message);
 }
 
@@ -298,8 +312,12 @@ async function togglePlanToday(id) {
   const item = state.items.find((entry) => entry.id === id);
   if (!item) return;
   const today = todayISO();
-  item.plannedTodayAt = item.plannedTodayAt === today ? null : today;
-  await saveItem(item);
+  const next = item.plannedTodayAt === today ? null : today;
+  const { error } = await supabaseClient.from("tracker_items").update({ planned_today_at: next })
+    .eq("id", id).eq("user_id", currentUser.id).select("id").single();
+  if (error) { window.alert(error.message); return; }
+  item.plannedTodayAt = next;
+  if (!next) daySlots = daySlots.filter(slot => slot.habit_id !== id);
   render();
 }
 
@@ -342,6 +360,7 @@ async function setArchived(id, archived, button) {
       .update({ archived }).eq("id", id).eq("user_id", currentUser.id).select("id").single();
     if (error) throw error;
     item.archived = archived;
+    if (archived) daySlots = daySlots.filter(slot => slot.habit_id !== id);
     render();
     return true;
   } catch (error) {
@@ -383,6 +402,16 @@ function renderToday() {
   document.querySelector("#taskArchive").hidden = todayMode !== "tasks";
   document.querySelector("#habitArchive").hidden = todayMode !== "habits";
   const list = document.querySelector("#todayList");
+  const planning = todayMode === "plan";
+  document.querySelector("#backToPlan").hidden = planning;
+  document.querySelector("#todayCount").hidden = planning;
+  document.querySelector("#dayPlan").hidden = !planning;
+  if (planning) {
+    list.replaceChildren();
+    setEmpty("#todayEmpty", false);
+    renderDayPlan();
+    return;
+  }
   const items = sortTodayItems(todayItems().filter((item) => {
     if (todayMode === "tasks") return item.type === "task";
     if (todayMode === "habits") return item.type === "habit";
@@ -841,7 +870,7 @@ function registerServiceWorker() {
 }
 
 function exportData() {
-  const payload = JSON.stringify({ exportedAt: new Date().toISOString(), app: "my-day-tracker-cloud", version: 1, state }, null, 2);
+  const payload = JSON.stringify({ exportedAt: new Date().toISOString(), app: "my-day-tracker-cloud", version: 2, state, dayPlan: { day: todayISO(), slots: daySlots } }, null, 2);
   const blob = new Blob([payload], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -865,9 +894,19 @@ function importData(event) {
       for (const item of nextState.items) {
         await saveItem({ ...item, completionDates: item.completionDates || [], createdAt: item.createdAt || new Date().toISOString() }, true);
       }
+      if (parsed.dayPlan?.day === todayISO() && parsed.dayPlan.slots?.length) {
+        const rows = parsed.dayPlan.slots.map(({ hour, habit_id, note }) => ({
+          user_id: currentUser.id, day: todayISO(), hour, habit_id, note
+        }));
+        const { error } = await supabaseClient.from("tracker_day_slots")
+          .upsert(rows, { onConflict: "user_id,day,hour", ignoreDuplicates: true });
+        if (error) throw error;
+      }
+    } catch (error) {
+      window.alert("Не удалось завершить импорт: " + error.message);
+    } finally {
       await loadCloudState();
       render();
-    } finally {
       event.target.value = "";
     }
   });
