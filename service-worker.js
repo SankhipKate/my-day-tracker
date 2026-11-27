@@ -1,9 +1,10 @@
-const CACHE_NAME = "my-day-tracker-cloud-v3";
+const CACHE_NAME = "my-day-tracker-cloud-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./day-plan.js",
   "./supabase-config.js",
   "./manifest.webmanifest",
   "./icons/checklist-180.png",
@@ -27,7 +28,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {

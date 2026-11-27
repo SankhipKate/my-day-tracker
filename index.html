@@ -12,7 +12,7 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <span class="app-version">v1.1.0</span>
+        <span class="app-version">v1.2.0</span>
         <div class="top-actions">
           <button class="small-button" id="exportData" type="button">Export</button>
           <button class="small-button" id="importData" type="button">Import</button>
@@ -46,16 +46,18 @@
       <main id="appContent">
         <section class="view is-active" id="viewToday" aria-labelledby="todayLabel">
           <div class="section-heading">
+            <button class="ghost-button" id="backToPlan" hidden>К плану дня</button>
             <span id="todayCount">0 задач</span>
           </div>
 
           <div class="quick-filters today-modes" aria-label="Режим сегодня">
             <button class="chip task-mode" data-today-mode="tasks">Задачи</button>
-            <button class="chip habit-mode is-active" data-today-mode="habits">Привычки</button>
+            <button class="chip habit-mode" data-today-mode="habits">Привычки</button>
             <button class="chip" data-today-mode="urgency">Срочность</button>
             <button class="chip" data-today-mode="category">Категории</button>
           </div>
 
+          <section id="dayPlan" aria-label="План дня"></section>
           <div class="task-list" id="todayList"></div>
           <div class="empty-state" id="todayEmpty">
             <h3>На сегодня пусто</h3>
@@ -179,10 +181,22 @@
       </div>
     </dialog>
 
+    <dialog class="task-dialog" id="slotDialog" aria-labelledby="slotTitle">
+      <form id="slotForm">
+        <div class="dialog-header"><h2 id="slotTitle">План дня</h2><button type="button" class="ghost-button" id="slotClose">Закрыть</button></div>
+        <label id="noteLabel">Запись<input id="slotNote" maxlength="240" placeholder="Обед, дорога…"></label>
+        <label>Время<select id="slotHour"></select></label>
+        <button class="primary-button">Сохранить</button>
+        <button class="ghost-button" type="button" id="slotRemove"></button>
+        <button class="ghost-button" type="button" id="slotUnstar">Снять звезду</button>
+      </form>
+    </dialog>
+
     <input id="backupFile" type="file" accept="application/json,.json" hidden>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
+    <script src="./day-plan.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
