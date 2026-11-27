@@ -7,12 +7,12 @@
     <title>Сегодня</title>
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" sizes="180x180" href="./icons/checklist-180.png">
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=1.2.1">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <span class="app-version">v1.2.0</span>
+        <span class="app-version">v1.2.1</span>
         <div class="top-actions">
           <button class="small-button" id="exportData" type="button">Export</button>
           <button class="small-button" id="importData" type="button">Import</button>
@@ -183,12 +183,13 @@
 
     <dialog class="task-dialog" id="slotDialog" aria-labelledby="slotTitle">
       <form id="slotForm">
-        <div class="dialog-header"><h2 id="slotTitle">План дня</h2><button type="button" class="ghost-button" id="slotClose">Закрыть</button></div>
+        <div class="dialog-header"><h2 id="slotTitle">План дня</h2><button class="ghost-button" type="button" id="slotUnstar">Снять звезду</button></div>
         <label id="noteLabel">Запись<input id="slotNote" maxlength="240" placeholder="Обед, дорога…"></label>
+        <label>Длительность<select id="slotMinutes"><option value="30">30 минут</option><option value="60">1 час</option></select></label>
         <label>Время<select id="slotHour"></select></label>
         <button class="primary-button">Сохранить</button>
         <button class="ghost-button" type="button" id="slotRemove"></button>
-        <button class="ghost-button" type="button" id="slotUnstar">Снять звезду</button>
+        <button type="button" class="ghost-button" id="slotClose">Закрыть</button>
       </form>
     </dialog>
 
@@ -196,7 +197,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
-    <script src="./day-plan.js"></script>
-    <script src="./app.js"></script>
+    <script src="./day-plan.js?v=1.2.1"></script>
+    <script src="./app.js?v=1.2.1"></script>
   </body>
 </html>

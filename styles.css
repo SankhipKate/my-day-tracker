@@ -672,3 +672,9 @@ select {
 .plan-target { outline: 2px solid var(--accent); }
 #slotDialog form { display: grid; gap: .8rem; }
 #slotDialog [hidden], #dayPlan[hidden], #backToPlan[hidden] { display: none; }
+.plan-row { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.plan-drag-preview {
+  position: fixed; z-index: 100; pointer-events: none;
+  max-width: min(74vw, 320px); padding: 9px 14px; border-radius: 12px;
+  background: var(--accent); color: white; box-shadow: var(--shadow);
+}
