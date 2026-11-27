@@ -80,6 +80,7 @@ function bindEvents() {
   document.querySelectorAll(".tab").forEach((button) => {
     button.addEventListener("click", () => {
       activeView = button.dataset.view;
+      if (activeView === "today") todayMode = "plan";
       render();
     });
   });
@@ -196,7 +197,7 @@ async function loadCloudState() {
   }
   const [items, slots] = await Promise.all([
     supabaseClient.from("tracker_items").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-    supabaseClient.from("tracker_day_slots").select("hour,habit_id,note").eq("user_id", user.id).eq("day", day)
+    supabaseClient.from("tracker_day_slots").select("hour,minutes,habit_id,note").eq("user_id", user.id).eq("day", day)
   ]);
   if (request !== cloudRequest || user.id !== currentUser?.id || day !== todayISO()) return;
   state.items = (items.data || []).map(fromRow);
@@ -895,8 +896,8 @@ function importData(event) {
         await saveItem({ ...item, completionDates: item.completionDates || [], createdAt: item.createdAt || new Date().toISOString() }, true);
       }
       if (parsed.dayPlan?.day === todayISO() && parsed.dayPlan.slots?.length) {
-        const rows = parsed.dayPlan.slots.map(({ hour, habit_id, note }) => ({
-          user_id: currentUser.id, day: todayISO(), hour, habit_id, note
+        const rows = parsed.dayPlan.slots.map(({ hour, minutes = 60, habit_id, note }) => ({
+          user_id: currentUser.id, day: todayISO(), hour, minutes, habit_id, note
         }));
         const { error } = await supabaseClient.from("tracker_day_slots")
           .upsert(rows, { onConflict: "user_id,day,hour", ignoreDuplicates: true });
