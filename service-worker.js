@@ -1,10 +1,10 @@
-const CACHE_NAME = "my-day-tracker-cloud-v5";
+const CACHE_NAME = "my-day-tracker-cloud-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=1.2.1",
-  "./app.js?v=1.2.1",
-  "./day-plan.js?v=1.2.1",
+  "./styles.css?v=1.2.3",
+  "./app.js?v=1.2.3",
+  "./day-plan.js?v=1.2.3",
   "./supabase-config.js",
   "./manifest.webmanifest",
   "./icons/checklist-180.png",
